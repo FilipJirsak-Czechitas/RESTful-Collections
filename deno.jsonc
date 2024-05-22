@@ -1,0 +1,6 @@
+{
+  "name": "@czechitas/restful-collections",
+  "version": "0.1.0",
+  "exports": "./mod.ts",
+  "importMap": "./vendor/import_map.json"
+}
