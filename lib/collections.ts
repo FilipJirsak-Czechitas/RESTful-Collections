@@ -1,7 +1,6 @@
-import type { Context } from "https://deno.land/x/hono@v4.3.7/context.ts";
-import { HTTPException } from "https://deno.land/x/hono@v4.3.7/http-exception.ts";
-import { Hono } from "https://deno.land/x/hono@v4.3.7/hono.ts";
-import { ulid } from "jsr:@std/ulid@0.224.0";
+import { Hono, type Context } from "@hono/hono";
+import { HTTPException } from "@hono/hono/http-exception";
+import { ulid } from "@std/ulid";
 
 type ParamMapper = (c: Context) => string;
 export type KeyBuilder<Value> = (value: Value, c: Context) => Deno.KvKey;
