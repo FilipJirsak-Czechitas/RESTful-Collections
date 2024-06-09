@@ -1,0 +1,35 @@
+### List all projects
+GET {{baseURI}}/api/projects
+
+### Get project by ID
+GET {{baseURI}}/api/projects/01HZYE23WYAP6RXNY45NEG6DGR
+
+### Get non-existent project
+GET {{baseURI}}/api/projects/00000000000000000000000000
+
+### Create project
+POST {{baseURI}}/api/projects
+Content-Type: application/json
+
+{
+  "title": "Project 1"
+}
+
+### Update project
+PUT {{baseURI}}/api/projects/01HZYE23WYAP6RXNY45NEG6DGR
+Content-Type: application/json
+
+{
+  "title": "Project 1"
+}
+
+### Update project
+PATCH {{baseURI}}/api/projects/01HZYE23WYAP6RXNY45NEG6DGR
+Content-Type: application/json
+
+{
+  "description": "Description of Project 1"
+}
+
+### Delete project
+DELETE {{baseURI}}/api/projects/01HZYE68C4FRBDM63843S0M3XX

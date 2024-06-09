@@ -2,6 +2,9 @@
   "name": "@czechitas/restful-collections",
   "version": "0.1.0",
   "exports": "./mod.ts",
+  "tasks": {
+    "demo": "deno serve --watch --unstable-kv ./demo/demo.ts"
+  },
   "imports": {
     "@hono/hono": "jsr:@hono/hono@^4.4.0",
     "@std/ulid": "jsr:@std/ulid@^0.224.1"

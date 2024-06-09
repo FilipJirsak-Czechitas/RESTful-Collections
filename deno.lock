@@ -18,7 +18,10 @@
       }
     }
   },
-  "remote": {},
+  "remote": {
+    "https://deno.land/x/hono@v4.3.7/utils/http-status.ts": "f5b820f2793e45209f34deddf147b23e3133a89eb4c57dc643759a504706636b",
+    "https://deno.land/x/oak_commons@0.4.0/status.ts": "f13e0e61c2aaf5e254ca528569b03896aee89d96ebc256fa740ea7305a68f53f"
+  },
   "workspace": {
     "dependencies": [
       "jsr:@hono/hono@^4.4.0",
