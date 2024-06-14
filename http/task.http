@@ -1,0 +1,42 @@
+### List all tasks
+GET {{baseURI}}/api/tasks
+
+### Get task by ID
+GET {{baseURI}}/api/tasks/01J0BKVT74WV0FVBPGYKWRQ55Y
+
+### Get non-existent task
+GET {{baseURI}}/api/tasks/00000000000000000000000000
+
+### Get task by project
+GET {{baseURI}}/api/tasks/by-project/01J0BKV6WZ49JBY6Z6Z95Q10A2
+
+
+### Create task
+POST {{baseURI}}/api/tasks
+Content-Type: application/json
+
+{
+  "project": "01J0BKV6WZ49JBY6Z6Z95Q10A2",
+  "title": "Task 1",
+  "date": "2021-01-01",
+  "time": "12:00"
+}
+
+### Update project
+PUT {{baseURI}}/api/tasks/01HZYE23WYAP6RXNY45NEG6DGR
+Content-Type: application/json
+
+{
+  "title": "Project 1"
+}
+
+### Update project
+PATCH {{baseURI}}/api/tasks/01HZYE23WYAP6RXNY45NEG6DGR
+Content-Type: application/json
+
+{
+  "description": "Description of Project 1"
+}
+
+### Delete project
+DELETE {{baseURI}}/api/tasks/01HZYE68C4FRBDM63843S0M3XX
