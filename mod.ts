@@ -1,1 +1,1 @@
-export { createCollections, type KeyBuilder, type KeyBuilders, type RESTfulOptions, type ResultMetadata } from "./lib/collections.ts";
+export { createCollections, type KeyBuilder, type KeyBuilders, type RESTfulOptions, type ResultWithMetadata } from "./lib/collections.ts";
