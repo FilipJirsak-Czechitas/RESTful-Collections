@@ -1,5 +1,6 @@
 import {Hono} from "@hono/hono";
 import {createCollections, RESTfulOptions} from "../mod.ts";
+import {Context} from "@hono/hono";
 
 type Task = {
   project: string;
@@ -20,7 +21,10 @@ const collections = await createCollections({
   } satisfies RESTfulOptions<Task>,
 });
 
+const api = collections.buildServer()
+api.get("/all-tasks", async (c:Context) => c.json(await collections.collections.tasks.list()))
+
 const app = new Hono();
-app.route("/api", collections.buildServer());
+app.route("/api", api);
 
 export default app;

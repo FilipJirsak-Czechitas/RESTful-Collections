@@ -21,12 +21,14 @@ export type ResultWithMetadata<Value> = Value & {
   $$versionstamp: string;
 };
 
+const secondaryIndexSuffix = "$$secondaryIndex";
+
 export class RESTfulCollection<Value = unknown> {
   constructor(
     private kv: Deno.Kv,
     public name: string,
     private createId: () => string,
-    private secondaryIndexBuilders: KeyBuilders<Value>,
+    public secondaryIndexBuilders: KeyBuilders<Value>,
   ) {}
 
   async list(): Promise<ResultWithMetadata<Value>[]> {
@@ -34,11 +36,34 @@ export class RESTfulCollection<Value = unknown> {
     const response: ResultWithMetadata<Value>[] = [];
     const iter = this.kv.list<Value>({ prefix: key });
     for await (const item of iter) {
-      const id = item.key[item.key.length - 1] as string;
+      const id = item.key.at(-1) as string;
       const value: ResultWithMetadata<Value> = {
         $$id: id,
         $$versionstamp: item.versionstamp,
         ...item.value,
+      };
+      response.push(value);
+    }
+    return response;
+  }
+
+  async listSubcollection(
+    subcollection: string,
+    keys: string[],
+  ): Promise<ResultWithMetadata<Value>[]> {
+    const key = [this.name + secondaryIndexSuffix, subcollection, ...keys];
+    const response: ResultWithMetadata<Value>[] = [];
+    const iter = this.kv.list<{}>({ prefix: key });
+    for await (const item of iter) {
+      const id = item.key.at(-1) as string;
+      const kvGetResult = await this.kv.get<Value>([this.name, id]);
+      if (kvGetResult.value === null) {
+        continue;
+      }
+      const value: ResultWithMetadata<Value> = {
+        $$id: id,
+        $$versionstamp: kvGetResult.versionstamp!,
+        ...kvGetResult.value,
       };
       response.push(value);
     }
@@ -76,7 +101,7 @@ export class RESTfulCollection<Value = unknown> {
     const key = [this.name, id];
     const kvGetResult = await this.kv.get<Value>(key);
     const oldValue = kvGetResult.value;
-    if (oldValue == null) {
+    if (oldValue === null) {
       return null;
     }
     const resultKvSet = await this.kv.set(key, value);
@@ -95,7 +120,7 @@ export class RESTfulCollection<Value = unknown> {
     const key = [this.name, id];
     const kvGetResult = await this.kv.get<Value>(key);
     const oldValue = kvGetResult.value;
-    if (oldValue == null) {
+    if (oldValue === null) {
       return null;
     }
 
@@ -111,10 +136,9 @@ export class RESTfulCollection<Value = unknown> {
 
   async delete(id: string): Promise<ResultWithMetadata<Value> | null> {
     const key = [this.name, id];
-    await this.kv.delete(key);
     const kvGetResult = await this.kv.get<Value>(key);
     const oldValue = kvGetResult.value;
-    if (oldValue == null) {
+    if (oldValue === null) {
       return null;
     }
     await this.kv.delete(key);
@@ -130,12 +154,17 @@ export class RESTfulCollection<Value = unknown> {
     return Object.entries(this.secondaryIndexBuilders)
       .map((
         [indexName, keyBuilder],
-      ) => [this.name, name, ...keyBuilder(value)]);
+      ) => [
+        this.name + secondaryIndexSuffix,
+        indexName,
+        ...keyBuilder(value),
+        id,
+      ]);
   }
 
   private async appendSecondaryKeys(id: string, value: Value) {
     const promises = this.buildSecondaryKeys(id, value)
-      .map((key) => this.kv.set(key, id));
+      .map((key) => this.kv.set(key, {}));
     await Promise.all(promises);
   }
 
@@ -152,10 +181,24 @@ const buildResponse = async <T>(
   status?: StatusCode,
 ): Promise<Response> => {
   const response = await responseValuePromise;
+
   if (response === null) {
     return c.body(null, 404);
   }
   return c.json(response, status ?? 200);
+};
+
+const buildEmptyResponse = async <T>(
+  c: Context,
+  responseValuePromise: Promise<T>,
+  status?: StatusCode,
+): Promise<Response> => {
+  const response = await responseValuePromise;
+
+  if (response === null) {
+    return c.body(null, 404);
+  }
+  return c.body(null, status ?? 204);
 };
 
 const createHonoRoutes = (hono: Hono, collection: RESTfulCollection) => {
@@ -163,6 +206,20 @@ const createHonoRoutes = (hono: Hono, collection: RESTfulCollection) => {
     `/${collection.name}`,
     (c: Context) => buildResponse(c, collection.list()),
   );
+  Object.keys(collection.secondaryIndexBuilders)
+    .forEach((subCollectionName) => {
+      hono.get(
+        `/${collection.name}/:${subCollectionName}/:key{.+$}`,
+        (c: Context) =>
+          buildResponse(
+            c,
+            collection.listSubcollection(
+              subCollectionName,
+              c.req.param("key").split("/").filter((part) => part.length > 0),
+            ),
+          ),
+      );
+    });
   hono.get(
     `/${collection.name}/:id`,
     (c: Context) => buildResponse(c, collection.get(c.req.param("id"))),
@@ -188,23 +245,30 @@ const createHonoRoutes = (hono: Hono, collection: RESTfulCollection) => {
         collection.merge(c.req.param("id"), await c.req.json()),
       ),
   );
-  hono.delete(`/${collection.name}/:id`, async (c: Context) => {
-    await collection.delete(c.req.param("id"));
-    return c.body(null, 204);
-  });
+  hono.delete(`/${collection.name}/:id`, (c: Context) =>
+    buildEmptyResponse(
+      c,
+      collection.delete(c.req.param("id")),
+    ));
 };
 
 export class RESTfulCollections {
+  public collections: { [name: string]: RESTfulCollection };
+
   constructor(
     public kv: Deno.Kv,
-    public collections: RESTfulCollection[],
-  ) {}
+    collections: RESTfulCollection[],
+  ) {
+    this.collections = {};
+    collections.forEach((collection) =>
+      this.collections[collection.name] = collection
+    );
+  }
 
   buildServer(hono?: Hono) {
     hono ??= new Hono();
-    this.collections.forEach((collection) =>
-      createHonoRoutes(hono, collection)
-    );
+    Object.values(this.collections)
+      .forEach((collection) => createHonoRoutes(hono, collection));
     return hono;
   }
 }
@@ -240,7 +304,7 @@ export const createCollections = async (
     );
   };
   const collections = Object.entries(collectionDefs)
-      .filter(([_, options]) => !options.internal)
-      .map(createCollection);
+    .filter(([_, options]) => !options.internal)
+    .map(createCollection);
   return new RESTfulCollections(kv, collections);
 };
