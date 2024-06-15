@@ -265,7 +265,7 @@ export class RESTfulCollections {
     );
   }
 
-  buildServer(hono?: Hono) {
+  buildServer(hono?: Hono): Hono {
     hono ??= new Hono();
     Object.values(this.collections)
       .forEach((collection) => createHonoRoutes(hono, collection));
