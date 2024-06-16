@@ -2,20 +2,53 @@ import {type Context, Hono} from "@hono/hono";
 import type {StatusCode} from "@hono/hono/utils/http-status";
 import {ulid} from "@std/ulid";
 
+/**
+ * KeyBuilder is a type that represents a function that takes a collection value and returns a key for secondary index (Deno.KvKey).
+ * @typedef {function} KeyBuilder
+ * @param {Value} value - The value in collection, which will be converted into a Deno.KvKey.
+ * @returns {Deno.KvKey} - The resulting Deno.KvKey (key for secondary index).
+ */
 export type KeyBuilder<Value> = (value: Value) => Deno.KvKey;
+
+/**
+ * KeyBuilders is a type that represents an object where each property is a KeyBuilder function.
+ * Property name is name of subcollection.
+ * @typedef {Object} KeyBuilders
+ */
 export type KeyBuilders<Value> = { [name: string]: KeyBuilder<Value> };
 
+/**
+ * RESTfulGlobalOptions is a type that represents the global options for a RESTful service.
+ * @typedef {Object} RESTfulGlobalOptions
+ * @property {function} createId - A function that generates a unique ID of collection item.
+ * @property {boolean} internal - A flag indicating whether the collection is internal, i.e. it is not published into REST API.
+ */
 export type RESTfulGlobalOptions = {
   createId: () => string;
   internal: boolean;
 };
 
+/**
+ * RESTfulOptionsAll is a type that represents all the options for a RESTful service.
+ * @typedef {Object} RESTfulOptionsAll
+ * @property {KeyBuilders} secondaryIndexes - An object containing secondary index KeyBuilder functions.
+ */
 export type RESTfulOptionsAll<Value = unknown> = RESTfulGlobalOptions & {
   secondaryIndexes: KeyBuilders<Value>;
 };
 
+/**
+ * RESTfulOptions is a type that represents a subset of the options for a RESTful service. All options are optional.
+ * @typedef {Object} RESTfulOptions
+ */
 export type RESTfulOptions<Value = unknown> = Partial<RESTfulOptionsAll<Value>>;
 
+/**
+ * ResultWithMetadata is a type that represents a collection item with additional metadata.
+ * @typedef {Object} ResultWithMetadata
+ * @property {string} $$id - The unique ID of the collection item.
+ * @property {string} $$versionstamp - The timestamp of the value (last modification date and time).
+ */
 export type ResultWithMetadata<Value> = Value & {
   $$id: string;
   $$versionstamp: string;
@@ -23,6 +56,14 @@ export type ResultWithMetadata<Value> = Value & {
 
 const secondaryIndexSuffix = "$$secondaryIndex";
 
+/**
+ * RESTfulCollection is a class that represents a RESTful collection.
+ * @class
+ * @property {Deno.Kv} kv - The Deno.Kv instance used for key-value storage.
+ * @property {string} name - The name of the collection.
+ * @property {function} createId - A function that generates a unique ID.
+ * @property {KeyBuilders} secondaryIndexBuilders - An object containing secondary index KeyBuilder functions.
+ */
 export class RESTfulCollection<Value = unknown> {
   constructor(
     private kv: Deno.Kv,
@@ -31,6 +72,12 @@ export class RESTfulCollection<Value = unknown> {
     public secondaryIndexBuilders: KeyBuilders<Value>,
   ) {}
 
+  /**
+   * This method lists all items in the collection.
+   * @async
+   * @method
+   * @returns {Promise<ResultWithMetadata<Value>[]>} - A promise that resolves to an array of items in the collection.
+   */
   async list(): Promise<ResultWithMetadata<Value>[]> {
     const key = [this.name];
     const response: ResultWithMetadata<Value>[] = [];
@@ -47,6 +94,14 @@ export class RESTfulCollection<Value = unknown> {
     return response;
   }
 
+  /**
+   * This method lists all items in a subcollection.
+   * @async
+   * @method
+   * @param {string} subcollection - The name of the subcollection.
+   * @param {string[]} keys - The keys of the items to list.
+   * @returns {Promise<ResultWithMetadata<Value>[]>} - A promise that resolves to an array of items in the subcollection.
+   */
   async listSubcollection(
     subcollection: string,
     keys: string[],
@@ -70,6 +125,13 @@ export class RESTfulCollection<Value = unknown> {
     return response;
   }
 
+  /**
+   * This method gets an item from the collection by its ID.
+   * @async
+   * @method
+   * @param {string} id - The ID of the item to get.
+   * @returns {Promise<ResultWithMetadata<Value> | null>} - A promise that resolves to the item or null if it does not exist.
+   */
   async get(id: string): Promise<ResultWithMetadata<Value> | null> {
     const key = [this.name, id];
     const kvGetResult = await this.kv.get<Value>(key);
@@ -83,6 +145,13 @@ export class RESTfulCollection<Value = unknown> {
     };
   }
 
+  /**
+   * This method appends an item to the collection.
+   * @async
+   * @method
+   * @param {Value} value - The value of the item to append.
+   * @returns {Promise<ResultWithMetadata<Value>>} - A promise that resolves to the appended item.
+   */
   async append(value: Value): Promise<ResultWithMetadata<Value>> {
     const id = this.createId();
     const key = [this.name, id];
@@ -94,6 +163,14 @@ export class RESTfulCollection<Value = unknown> {
     return { $$id: id, $$versionstamp: resultKvSet.versionstamp, ...value };
   }
 
+  /**
+   * This method replaces an item in the collection by its ID.
+   * @async
+   * @method
+   * @param {string} id - The ID of the item to replace.
+   * @param {Value} value - The new value of the item.
+   * @returns {Promise<ResultWithMetadata<Value> | null>} - A promise that resolves to the replaced item or null if it does not exist.
+   */
   async replace(
     id: string,
     value: Value,
@@ -113,6 +190,14 @@ export class RESTfulCollection<Value = unknown> {
     return { $$id: id, $$versionstamp: resultKvSet.versionstamp, ...value };
   }
 
+  /**
+   * This method merges an item in the collection with a partial value by its ID.
+   * @async
+   * @method
+   * @param {string} id - The ID of the item to merge.
+   * @param {Partial<Value>} mergeValue - The partial value to merge with the item.
+   * @returns {Promise<ResultWithMetadata<Value> | null>} - A promise that resolves to the merged item or null if it does not exist.
+   */
   async merge(
     id: string,
     mergeValue: Partial<Value>,
@@ -134,6 +219,13 @@ export class RESTfulCollection<Value = unknown> {
     return { $$id: id, $$versionstamp: resultKvSet.versionstamp, ...value };
   }
 
+  /**
+   * This method deletes an item from the collection by its ID.
+   * @async
+   * @method
+   * @param {string} id - The ID of the item to delete.
+   * @returns {Promise<ResultWithMetadata<Value> | null>} - A promise that resolves to the deleted item or null if it does not exist.
+   */
   async delete(id: string): Promise<ResultWithMetadata<Value> | null> {
     const key = [this.name, id];
     const kvGetResult = await this.kv.get<Value>(key);
@@ -252,7 +344,19 @@ const createHonoRoutes = (hono: Hono, collection: RESTfulCollection) => {
     ));
 };
 
+/**
+ * RESTfulCollections is a class that represents a collection of RESTful collections.
+ * @class
+ * @property {Deno.Kv} kv - The Deno.Kv instance used for key-value storage.
+ * @property {Object} collections - An object where each property is a RESTfulCollection.
+ */
 export class RESTfulCollections {
+  /**
+   * A public property of the RESTfulCollections class.
+   * It is an object where each property is a RESTfulCollection.
+   * The property name is the name of the collection.
+   * @type {Object.<string, RESTfulCollection>}
+   */
   public collections: { [name: string]: RESTfulCollection };
 
   constructor(
@@ -265,6 +369,14 @@ export class RESTfulCollections {
     );
   }
 
+  /**
+   * This method builds a Hono server with routes for each collection in the RESTfulCollections instance.
+   * If a Hono instance is not provided, a new one is created.
+   *
+   * @method
+   * @param {Hono} [hono] - An optional Hono instance to which the routes will be added.
+   * @returns {Hono} - A Hono instance with routes for each collection.
+   */
   buildServer(hono?: Hono): Hono {
     hono ??= new Hono();
     Object.values(this.collections)
@@ -283,6 +395,13 @@ const defaultOptions: RESTfulOptionsAll = {
   internal: false,
 };
 
+/**
+ * createCollections is a function that creates a RESTfulCollections instance.
+ * @function
+ * @param {CollectionsConfiguration} collectionDefs - The definitions for the collections.
+ * @param {RESTfulGlobalOptions} globalOptions - The global options for the collections.
+ * @returns {Promise<RESTfulCollections>} - A promise that resolves to a RESTfulCollections instance.
+ */
 export const createCollections = async (
   collectionDefs: CollectionsConfiguration,
   globalOptions?: Partial<RESTfulGlobalOptions>,
