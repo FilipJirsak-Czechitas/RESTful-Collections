@@ -41,6 +41,6 @@ Content-Type: application/json
 ### Delete task
 DELETE {{baseURI}}/api/tasks/01J0F33CH8NBW9VZVFCDQ95BQH
 
-### List all tasks – custom implementation
-GET {{baseURI}}/api/all-tasks
+### List notifications – custom implementation
+GET {{baseURI}}/api/notifications
 

@@ -68,8 +68,7 @@ export class RESTfulCollection<Value = unknown> {
   constructor(
     private kv: Deno.Kv,
     public name: string,
-    private createId: () => string,
-    public secondaryIndexBuilders: KeyBuilders<Value>,
+    public options: RESTfulOptionsAll<Value>
   ) {}
 
   /**
@@ -153,7 +152,7 @@ export class RESTfulCollection<Value = unknown> {
    * @returns {Promise<ResultWithMetadata<Value>>} - A promise that resolves to the appended item.
    */
   async append(value: Value): Promise<ResultWithMetadata<Value>> {
-    const id = this.createId();
+    const id = this.options.createId();
     const key = [this.name, id];
     const resultKvSet = await this.kv.set(key, value);
     if (!resultKvSet.ok) {
@@ -243,7 +242,7 @@ export class RESTfulCollection<Value = unknown> {
   }
 
   private buildSecondaryKeys(id: string, value: Value): Deno.KvKey[] {
-    return Object.entries(this.secondaryIndexBuilders)
+    return Object.entries(this.options.secondaryIndexes)
       .map((
         [indexName, keyBuilder],
       ) => [
@@ -298,7 +297,7 @@ const createHonoRoutes = (hono: Hono, collection: RESTfulCollection) => {
     `/${collection.name}`,
     (c: Context) => buildResponse(c, collection.list()),
   );
-  Object.keys(collection.secondaryIndexBuilders)
+  Object.keys(collection.options.secondaryIndexes)
     .forEach((subCollectionName) => {
       hono.get(
         `/${collection.name}/:${subCollectionName}/:key{.+$}`,
@@ -380,7 +379,8 @@ export class RESTfulCollections {
   buildServer(hono?: Hono): Hono {
     hono ??= new Hono();
     Object.values(this.collections)
-      .forEach((collection) => createHonoRoutes(hono, collection));
+        .filter(collection => !collection.options.internal)
+        .forEach((collection) => createHonoRoutes(hono, collection));
     return hono;
   }
 }
@@ -418,12 +418,10 @@ export const createCollections = async (
     return new RESTfulCollection(
       kv,
       name,
-      options.createId,
-      options.secondaryIndexes,
+      options
     );
   };
   const collections = Object.entries(collectionDefs)
-    .filter(([_, options]) => !options.internal)
     .map(createCollection);
   return new RESTfulCollections(kv, collections);
 };

@@ -19,10 +19,16 @@ const collections = await createCollections({
         : [value.project, value.date, "*"]),
     },
   } satisfies RESTfulOptions<Task>,
+  books: {},
+  films: {},
+  notifications: {
+    internal: true,
+  },
+  checkbox: {},
 });
 
 const api = collections.buildServer()
-api.get("/all-tasks", async (c:Context) => c.json(await collections.collections.tasks.list()))
+api.get("/notifications", async (c:Context) => c.json(await collections.collections.notifications.list()))
 
 const app = new Hono();
 app.route("/api", api);
